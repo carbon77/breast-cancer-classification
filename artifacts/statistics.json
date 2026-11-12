@@ -1,0 +1,31 @@
+{
+  "classes": {
+    "benign": 437,
+    "malignant": 210,
+    "normal": 133
+  },
+  "issues": {
+    "near_duplicate": 185,
+    "conflicting_labels": 18,
+    "exact_duplicate": 1
+  },
+  "split": {
+    "test": {
+      "benign": 64,
+      "malignant": 30,
+      "normal": 19
+    },
+    "train": {
+      "benign": 299,
+      "malignant": 143,
+      "normal": 92
+    },
+    "validation": {
+      "benign": 64,
+      "malignant": 31,
+      "normal": 20
+    }
+  },
+  "seed": 42,
+  "split_sha256": "36962aad47dc5038172d6fb4645d01d9c319aaa993da3e76fc8debf877ddae22"
+}

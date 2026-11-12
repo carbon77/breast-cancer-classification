@@ -1,0 +1,1 @@
+CLASSES = ("normal", "benign", "malignant")

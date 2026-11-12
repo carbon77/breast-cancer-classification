@@ -1,0 +1,11 @@
+numpy
+scipy
+pandas
+Pillow
+matplotlib
+torch
+torchvision
+dvc
+kagglehub
+nbclient
+ipykernel
