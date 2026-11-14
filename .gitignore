@@ -5,3 +5,4 @@ data/busi/
 *.pyc
 
 .dvc-store/
+artifacts/

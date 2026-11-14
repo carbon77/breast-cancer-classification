@@ -1,4 +1,4 @@
-"""Audit BUSI, group duplicate scans, and publish a deterministic split."""
+"""Проверка BUSI, учёт точных копий и воспроизводимое разбиение данных."""
 import argparse
 import hashlib
 import json
@@ -6,17 +6,21 @@ import random
 import re
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from PIL import Image
-from scipy.fft import dctn
 
 from . import CLASSES
 
+# У одного снимка может быть несколько масок: name_mask.png, name_mask_1.png и т. д.
 MASK = re.compile(r"(.+)_mask(?:_\d+)?$", re.I)
 
 
 def audit(root):
+    """Вернуть манифест читаемых снимков и список проблем с файлами и масками.
+
+    root — Path с каталогами классов. Маски связываются со снимками по имени
+    внутри класса; сами маски в строки манифеста не попадают.
+    """
     rows, issues = [], []
     for label in CLASSES:
         folder = root / label
@@ -34,20 +38,19 @@ def audit(root):
                     if im.format != "PNG":
                         raise ValueError("format")
                     im.verify()
+                # После verify() файл нужно открыть заново для загрузки пикселей.
                 with Image.open(path) as im:
                     im.load()
                     if match:
                         masks.setdefault(match[1], []).append((rel, im.size))
                         continue
-                    thumb = im.convert("L").resize((32, 32), Image.Resampling.LANCZOS)
-                    low = dctn(np.asarray(thumb, dtype=float), type=2)[:8, :8]
-                    bits = np.packbits(low > np.median(low)).tobytes().hex()
                     scans[path.stem] = dict(filepath=rel, width=im.width, height=im.height,
-                        channels=len(im.getbands()), mode=im.mode, phash=bits,
+                        channels=len(im.getbands()), mode=im.mode,
                         sha256=hashlib.sha256(path.read_bytes()).hexdigest())
             except (OSError, ValueError, SyntaxError):
                 issues.append(("invalid_png", rel))
         for name, scan in scans.items():
+            # pop убирает сопоставленные маски; оставшиеся ниже считаются сиротами.
             associated = masks.pop(name, [])
             if not associated:
                 issues.append(("missing_mask", scan["filepath"]))
@@ -60,63 +63,58 @@ def audit(root):
     return pd.DataFrame(rows), issues
 
 
-def group_scans(frame, issues, patients=None):
-    parents = list(range(len(frame)))
-
-    def find(i):
-        while parents[i] != i:
-            parents[i] = parents[parents[i]]
-            i = parents[i]
-        return i
-
-    hashes = [int(h, 16) for h in frame.phash]
-    paths = frame.filepath.tolist()
-    digests = frame.sha256.tolist()
-    for i, path in enumerate(paths):
-        for j in range(i):
-            near = (hashes[i] ^ hashes[j]).bit_count() <= 4
-            same_patient = patients and patients.get(path) and patients[path] == patients.get(paths[j])
-            if near or same_patient:
-                parents[find(i)] = find(j)
-            if near:
-                kind = "exact_duplicate" if digests[i] == digests[j] else "near_duplicate"
-                issues.append((kind, f"{paths[j]} | {path}"))
-    frame["group_id"] = [paths[find(i)] for i in range(len(frame))]
-    mixed = frame.groupby("group_id")["class"].transform("nunique") > 1
-    issues.extend(("conflicting_labels", path) for path in frame.loc[mixed, "filepath"])
-    return frame.loc[~mixed].copy()
+def eligible_scans(frame, issues):
+    """Оставить одну копию файла; одинаковые файлы с разными метками исключить."""
+    duplicates = frame[frame.sha256.duplicated(keep=False)]
+    excluded = []
+    for _, copies in duplicates.groupby("sha256"):
+        paths = copies.filepath.tolist()
+        issues.append(("exact_duplicate", " | ".join(paths)))
+        if copies["class"].nunique() > 1:
+            issues.extend(("conflicting_labels", path) for path in paths)
+            excluded.extend(paths)
+        else:
+            excluded.extend(paths[1:])
+    return frame[~frame.filepath.isin(excluded)]
 
 
 def stratify(frame):
+    """Перемешать пути внутри каждого класса и разделить в пропорции 70/15/15."""
     rng = random.Random(42)
-    assignments = {}
-    names = ["train", "validation", "test"]
+    rows = []
     for label in CLASSES:
-        groups = list(frame.loc[frame["class"] == label].groupby("group_id").size().items())
-        rng.shuffle(groups)
-        groups.sort(key=lambda pair: -pair[1])
-        targets = np.array([.70, .15, .15]) * sum(n for _, n in groups)
-        counts = np.zeros(3)
-        for group, size in groups:
-            index = int(np.argmax(targets - counts))
-            assignments[group] = names[index]
-            counts[index] += size
-    return frame.assign(split=frame.group_id.map(assignments))[["filepath", "class", "group_id", "split"]]
+        paths = sorted(frame.loc[frame["class"] == label, "filepath"])
+        rng.shuffle(paths)
+        train_end = round(.70 * len(paths))
+        validation_end = train_end + round(.15 * len(paths))
+        for name, subset in (("train", paths[:train_end]),
+                             ("validation", paths[train_end:validation_end]),
+                             ("test", paths[validation_end:])):
+            rows.extend((path, label, name) for path in subset)
+    return pd.DataFrame(rows, columns=["filepath", "class", "split"])
 
 
-def prepare(root, out, patients=None):
+def prepare(root, out):
+    """Провести аудит, сохранить манифест, split и отчёты; вернуть статистику.
+
+    root и out — Path. Уже сохранённый split_v2 разрешено записать повторно
+    только при побайтовом совпадении, чтобы не подменить разбиение эксперимента.
+    """
     frame, issues = audit(root)
-    eligible = group_scans(frame, issues, patients)
+    eligible = eligible_scans(frame, issues)
     split = stratify(eligible)
     (out / "splits").mkdir(parents=True, exist_ok=True)
-    path = out / "splits/split_v1.csv"
+    path = out / "splits/split_v2.csv"
     content = split.to_csv(index=False, lineterminator="\n").encode()
+    # Явный перевод строки обеспечивает одинаковые байты CSV на разных ОС.
     if path.exists() and path.read_bytes() != content:
-        raise ValueError("Existing split_v1 differs. Use a new output directory to review the dataset revision.")
+        raise ValueError("Existing split_v2 differs. Use a new output directory to review the dataset revision.")
     path.write_bytes(content)
+    # Загрузчик сверяет эту сумму перед использованием разбиения.
     digest = hashlib.sha256(content).hexdigest()
     path.with_suffix(".sha256").write_text(digest + "\n", encoding="ascii")
     frame.to_csv(out / "manifest.csv", index=False)
+    # Манифест включает и снимки, исключённые из split из-за конфликта меток.
     pd.DataFrame(issues, columns=["issue", "files"]).to_csv(out / "audit.csv", index=False)
     stats = dict(classes=frame["class"].value_counts().to_dict(), issues=pd.Series([k for k, _ in issues]).value_counts().to_dict(),
                  split=split.groupby(["class", "split"]).size().unstack(fill_value=0).to_dict(), seed=42, split_sha256=digest)
@@ -128,17 +126,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path("data/busi"))
     parser.add_argument("--out", type=Path, default=Path("artifacts"))
-    parser.add_argument("--patients", type=Path, help="CSV with filepath,patient_id")
     parser.add_argument("--kaggle", action="store_true")
     args = parser.parse_args()
     if args.kaggle:
         import kagglehub
         import shutil
         source = Path(kagglehub.dataset_download("aryashah2k/breast-ultrasound-images-dataset"))
+        # В архиве Kaggle каталоги классов могут находиться во вложенной папке.
         source = next(p.parent for p in source.rglob("benign") if p.is_dir())
         shutil.copytree(source, args.root)
-    patients = None
-    if args.patients:
-        ids = pd.read_csv(args.patients, dtype=str).dropna()
-        patients = ids.set_index("filepath", verify_integrity=True).patient_id.to_dict()
-    print(json.dumps(prepare(args.root, args.out, patients), indent=2))
+    print(json.dumps(prepare(args.root, args.out), indent=2))

@@ -46,7 +46,7 @@ Kaggle Breast Ultrasound Images Dataset
 - При наличии надёжного идентификатора пациентки или исследования split выполняется на его уровне, чтобы снимки одного случая не оказались в разных подвыборках.
 - Если такую связь восстановить нельзя, это документируется как риск возможной утечки и завышенных метрик.
 - Фиксируются random seed и состав/индексы split, чтобы эксперимент можно было повторить.
-- Конкретные пропорции (70 / 15 / 15), защита от почти одинаковых снимков (pHash-группы), seed и версионирование `split_v1` описаны в [baseline-experiment-plan.md](baseline-experiment-plan.md#1-единый-trainvalidationtest-split).
+- Конкретные пропорции (70 / 15 / 15), обработка побайтовых дубликатов, seed и версионирование `split_v2` описаны в [baseline-experiment-plan.md](baseline-experiment-plan.md#1-единый-trainvalidationtest-split).
 
 ## Preprocessing
 

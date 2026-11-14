@@ -1,0 +1,16 @@
+[project]
+name = "breast-cancer-classification"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "onnxruntime",
+    "pandas",
+    "pillow",
+    "dvc",
+    "dvc-s3",
+    "kagglehub",
+]
+
+[tool.uv]
+package = false
