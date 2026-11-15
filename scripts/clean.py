@@ -1,4 +1,5 @@
 """Remove local data and generated artifacts, retaining split versions and DVC pointers."""
+
 import argparse
 import shutil
 from pathlib import Path
@@ -12,7 +13,11 @@ def clean(root, dry_run=False):
         if not directory.exists():
             continue
         for path in sorted(directory.iterdir()):
-            if path.name.startswith(".") or path.suffix == ".dvc" or path == root / "artifacts/splits":
+            if (
+                path.name.startswith(".")
+                or path.suffix == ".dvc"
+                or path == root / "artifacts/splits"
+            ):
                 continue
             if path.resolve() != path:
                 raise ValueError(f"Unexpected cleanup path: {path}")

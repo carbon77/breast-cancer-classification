@@ -15,6 +15,22 @@ make test
 
 Тесты используют временные данные. Без GNU Make выполните после клонирования `uv sync --locked` и `uv run --locked python -m unittest discover -s tests`.
 
+## Окружение разработчика
+
+Для разработки uv выбирает Python 3.11 по файлу `.python-version`. Установите зависимости из lock-файла и подключите хуки в каждом новом клоне:
+
+```sh
+uv sync --locked
+uv run --locked pre-commit install
+```
+
+При коммите хуки проверяют изменённые Python-файлы. Для проверки всего проекта используйте `uv run --locked pre-commit run --all-files`. Проверки можно запустить отдельно:
+
+```sh
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+```
+
 ## Карта проекта
 
 | Каталог или файл | Назначение |
@@ -78,6 +94,8 @@ images, labels = next(iter(batches["train"]))
 Git хранит [указатель на BUSI](data/busi.dvc) и настройки DVC. DVC хранит исходные файлы BUSI. Разбиение и его контрольная сумма создаются локально при подготовке. Основной DVC remote `storage` указывает на `s3://zakatov-dash-app/dvc` в Yandex Object Storage. В [.dvc/config](.dvc/config) заданы endpoint `https://storage.yandexcloud.net` и регион `ru-central1`.
 
 Установите зависимости командой `uv sync --locked`. Для доступа к бакету задайте `AWS_ACCESS_KEY_ID` и `AWS_SECRET_ACCESS_KEY` в окружении или выберите настроенный профиль через `AWS_PROFILE`. Для восстановления нужен доступ на чтение объектов и просмотр префикса, для публикации — также на запись.
+
+Для локального файла настроек скопируйте [.env.example](.env.example) в `.env`. Оставьте только используемые строки: либо `AWS_PROFILE` с именем профиля, либо пару `AWS_ACCESS_KEY_ID` и `AWS_SECRET_ACCESS_KEY` со значениями. Передайте переменные через окружение оболочки или загрузите файл явно: `uv run --locked --env-file .env dvc pull data/busi.dvc`. Переменная `BUSI_ROOT` указывает путь к распакованным данным для `tests.verify_inputs`; при стандартном пути `data/busi` строку можно удалить. Индивидуальные параметры DVC можно хранить в `.dvc/config.local`.
 
 Команда `make pull` восстанавливает BUSI, а `make push` публикует его в S3. Без Make используйте `uv run --locked dvc pull data/busi.dvc` и `uv run --locked dvc push data/busi.dvc`. Для работы в Colab распакованный датасет можно скопировать из восстановленного каталога `data/busi` в папку Drive, указанную в ноутбуке.
 
