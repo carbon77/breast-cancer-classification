@@ -69,4 +69,4 @@ print(images.shape, preprocessing["classes"], preprocessing["split_sha256"])
 
 ## Обучение
 
-Архитектура baseline и метрики описаны в [плане экспериментов](baseline-experiment-plan.md). Точка входа `modeling.train` появится вместе с реализацией обучения. При обучении сохраняйте checkpoint вместе со словарём `preprocessing` и метриками в каталог результатов на Drive или в `/kaggle/working/artifacts` для сохранения в Output.
+Откройте [ноутбук обучения](../notebooks/02_train_colab.ipynb) в Google Colab, выберите GPU T4, модель, seed и папку результатов на Drive. Ячейка данных скачивает BUSI через KaggleHub; для обучения достаточно самого ноутбука. Для проверки восстановления задайте одну эпоху на сессию, затем в новой сессии выберите `resume` и лимит 0. Режим `test` оценивает лучший checkpoint завершённого запуска. Параметры сравнения приведены в [плане экспериментов](baseline-experiment-plan.md).

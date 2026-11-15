@@ -1,6 +1,6 @@
 # Классификация опухолей молочной железы по данным УЗИ
 
-Локальное окружение включает подготовку BUSI, DVC и ONNX Runtime для CPU. Для EDA доступен ноутбук Google Colab. Порядок будущего обучения описан в плане экспериментов. Команда предсказания и экспорт появятся вместе с обученной моделью.
+Локальное окружение включает подготовку BUSI, DVC и ONNX Runtime для CPU. Для обучения и оценки трёх моделей откройте [ноутбук экспериментов](notebooks/02_train_colab.ipynb) в Google Colab с GPU T4. Режим `new` начинает запуск, `resume` продолжает его с Google Drive, `test` оценивает лучший checkpoint.
 
 ## Быстрый старт
 
@@ -78,16 +78,7 @@ uv run --locked ruff format --check .
 | malignant | 146 | 31 | 32 |
 | Всего | 544 | 116 | 118 |
 
-В Colab после настройки путей используйте загрузчики для обучения:
-
-```python
-from busi.loading import loaders
-
-batches, preprocessing = loaders(root, art / "splits/split_v2.csv")
-images, labels = next(iter(batches["train"]))
-```
-
-Для предобученных CNN и ViT передайте соответствующий torchvision enum через `weights=`. В baseline среднее и СКО вычисляются по train. Сохраните возвращённый словарь preprocessing в checkpoint вместе со state_dict: в нём есть порядок классов, RGB, размер, интерполяция, нормализация и SHA-256 split.
+В [ноутбуке обучения](notebooks/02_train_colab.ipynb) BUSI скачивается напрямую из Kaggle. Ячейки создают PyTorch DataLoader для каждой выборки. Для baseline среднее и СКО вычисляются по train, для предобученных моделей используются параметры исходных весов. Эти параметры сохраняются в checkpoint.
 
 ## DVC
 
