@@ -6,3 +6,10 @@ data/busi/
 
 .dvc-store/
 artifacts/
+.env
+.env.*
+!.env.example
+.aws/
+.pytest_cache/
+.ruff_cache/
+models/*.pt
