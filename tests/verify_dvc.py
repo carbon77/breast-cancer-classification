@@ -1,4 +1,5 @@
 """Проверка восстановления данных и бинарного артефакта через DVC в чистом рабочем каталоге."""
+
 import hashlib
 import shutil
 import subprocess
@@ -9,13 +10,18 @@ from pathlib import Path
 
 def dvc(folder, *args):
     """Запустить DVC текущего Python в folder и прервать проверку при ошибке."""
-    subprocess.run([sys.executable, "-m", "dvc", *map(str, args)], cwd=folder, check=True)
+    subprocess.run(
+        [sys.executable, "-m", "dvc", *map(str, args)], cwd=folder, check=True
+    )
 
 
 def hashes(folder):
     """Вернуть SHA-256 каждого файла с путём относительно folder для сравнения копий."""
-    return {p.relative_to(folder): hashlib.sha256(p.read_bytes()).digest()
-            for p in folder.rglob("*") if p.is_file()}
+    return {
+        p.relative_to(folder): hashlib.sha256(p.read_bytes()).digest()
+        for p in folder.rglob("*")
+        if p.is_file()
+    }
 
 
 if __name__ == "__main__":

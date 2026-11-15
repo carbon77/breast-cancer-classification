@@ -1,4 +1,5 @@
 """Подготовка входов для базовой CNN и предобученных сетей классификации."""
+
 import hashlib
 from pathlib import Path
 
@@ -6,7 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms as T
 
 from . import CLASSES
@@ -31,7 +32,7 @@ def normalization(root, train):
         image = rgb(root, rel).resize((224, 224), Image.Resampling.BILINEAR)
         x = np.asarray(image, dtype=np.float64).reshape(-1, 3) / 255
         sums += x.sum(axis=0)
-        squares += (x*x).sum(axis=0)
+        squares += (x * x).sum(axis=0)
         pixels += len(x)
     mean = sums / pixels
     # Var(X) = E[X²] − E[X]²; отсечение нулём убирает погрешность округления.
@@ -79,12 +80,22 @@ def loaders(root, split_path, weights=None, batch_size=32, seed=42):
         # размер и остальные преобразования задаются общей схемой ниже.
         preset = weights.transforms()
         mean, std = list(preset.mean), list(preset.std)
-    config = dict(size=[224, 224], channels="RGB", interpolation="bilinear",
-                  mean=mean, std=std, classes=list(CLASSES), split_sha256=digest)
+    config = dict(
+        size=[224, 224],
+        channels="RGB",
+        interpolation="bilinear",
+        mean=mean,
+        std=std,
+        classes=list(CLASSES),
+        split_sha256=digest,
+    )
     base = [T.Resize((224, 224))]
-    augment = [T.RandomHorizontalFlip(), T.RandomRotation(10, interpolation=T.InterpolationMode.BILINEAR),
-               T.RandomResizedCrop(224, scale=(.85, 1), ratio=(1, 1)),
-               T.ColorJitter(brightness=.1, contrast=.1)]
+    augment = [
+        T.RandomHorizontalFlip(),
+        T.RandomRotation(10, interpolation=T.InterpolationMode.BILINEAR),
+        T.RandomResizedCrop(224, scale=(0.85, 1), ratio=(1, 1)),
+        T.ColorJitter(brightness=0.1, contrast=0.1),
+    ]
     post = [T.ToTensor(), T.Normalize(mean, std)]
     result = {}
     for name in ("train", "validation", "test"):
@@ -94,6 +105,10 @@ def loaders(root, split_path, weights=None, batch_size=32, seed=42):
         ds = BUSIDataset(root, rows[rows.split == name], transform)
         # Генератор с seed управляет порядком загрузки. Случайность самих
         # torchvision-аугментаций зависит также от глобального RNG PyTorch.
-        result[name] = DataLoader(ds, batch_size=batch_size, shuffle=name == "train",
-                                  generator=torch.Generator().manual_seed(seed))
+        result[name] = DataLoader(
+            ds,
+            batch_size=batch_size,
+            shuffle=name == "train",
+            generator=torch.Generator().manual_seed(seed),
+        )
     return result, config

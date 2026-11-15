@@ -20,7 +20,9 @@ class AuditTest(unittest.TestCase):
             for label in CLASSES:
                 (root / label).mkdir()
                 for i in range(8):
-                    image = Image.fromarray(rng.integers(0, 256, (64, 64), dtype=np.uint8))
+                    image = Image.fromarray(
+                        rng.integers(0, 256, (64, 64), dtype=np.uint8)
+                    )
                     image.save(root / label / f"{i}.png")
             source = root / "normal/0.png"
             # Та же картинка в другом классе создаёт конфликт меток,
@@ -30,7 +32,10 @@ class AuditTest(unittest.TestCase):
             (root / "benign/broken.png").write_bytes(b"bad")
             frame, issues = audit(root)
             self.assertEqual(len(frame), 25)
-            self.assertIn("0_mask_1.png", frame.loc[frame.filepath == "normal/0.png", "masks"].item())
+            self.assertIn(
+                "0_mask_1.png",
+                frame.loc[frame.filepath == "normal/0.png", "masks"].item(),
+            )
             eligible = eligible_scans(frame, issues)
             self.assertIn(("invalid_png", "benign/broken.png"), issues)
             self.assertIn(("conflicting_labels", "normal/0.png"), issues)
