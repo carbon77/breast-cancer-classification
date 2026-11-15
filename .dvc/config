@@ -1,0 +1,8 @@
+[core]
+    remote = storage
+['remote "local"']
+    url = ../.dvc-store
+['remote "storage"']
+    url = s3://zakatov-dash-app/dvc
+    endpointurl = https://storage.yandexcloud.net
+    region = ru-central1
